@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0F766E">
+<title>Barang Masuk</title>
+<style>
+  :root{--p:#0F766E;--pd:#115E59;--pl:#CCFBF1;--tint:#F0FDFA;--bg:#F5F7FA;--bd:#E5E7EB;--tx:#111827;--mu:#6B7280;--ph:#9CA3AF;
+        --g:#15803D;--gl:#DCFCE7;--r:#DC2626;--rl:#FEE2E2;--a:#B45309;--al:#FEF3C7}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:15px/1.35 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  button{font:inherit;border:0;cursor:pointer}
+  .app{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;background:var(--bg)}
+  /* login PIN: stok masuk ke cabang akun (owner/admin memilih cabang) */
+  .gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;gap:12px;padding:28px 20px;max-width:480px;margin:0 auto}
+  .gate[hidden]{display:none}
+  .gate form{display:flex;flex-direction:column;gap:12px}
+  .gate label{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:13px}
+  .gate label[hidden]{display:none}
+  .gate .btn.full{flex:none}
+  .hbtn{background:transparent;color:#fff;font-size:12px;font-weight:600;text-align:right;padding:4px 0}
+  header{background:var(--p);color:#fff;padding:12px 16px;display:flex;gap:12px;align-items:center;position:sticky;top:0;z-index:5}
+  header h1{font-size:17px;margin:0}
+  header p{margin:2px 0 0;font-size:12px;color:var(--pl)}
+  main{flex:1;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .card{background:#fff;border:1px solid var(--bd);border-radius:12px}
+  .scan{border:2px solid var(--p);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;background:#fff}
+  .scan.err{border-color:var(--r)}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1;min-width:0}
+  .ic{width:44px;height:44px;border-radius:22px;background:var(--pl);display:grid;place-items:center;flex:none}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:4px;background:#22C55E;margin-right:6px}
+  .scan.err .dot{background:var(--r)}
+  .muted{color:var(--mu);font-size:12px}
+  .inp{display:flex;align-items:center;gap:10px;background:#F3F4F6;border-radius:10px;padding:0 12px;height:46px}
+  .inp input{flex:1;min-width:0;border:0;background:transparent;font:600 17px/1 inherit;letter-spacing:1.5px;color:var(--tx);outline:none}
+  .inp input::placeholder{color:var(--tx)}
+  .inp small{font-size:11px;font-weight:600;color:var(--ph)}
+  .last{display:none;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--gl)}
+  .last.show{display:flex}
+  .last.warn{background:var(--rl)}
+  .last .ok{width:28px;height:28px;border-radius:14px;background:#22C55E;display:grid;place-items:center;flex:none}
+  .last.warn .ok{background:var(--r)}
+  .last b{display:block;font-size:14px}
+  .last span{font-size:12px;font-weight:500;color:var(--g)}
+  .last.warn span{color:var(--r)}
+  .lh{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:14px}
+  .link{background:none;color:var(--r);font-weight:600;font-size:13px;padding:4px}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:#fff;border:1px solid var(--bd)}
+  .item.hl{background:var(--tint);border-color:var(--p)}
+  .thumb{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:13px;color:rgba(0,0,0,.45);flex:none}
+  .item b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .st{font-size:11px;font-weight:600;color:var(--p)}
+  .step{display:flex;align-items:center;gap:6px;flex:none}
+  .step button{width:36px;height:36px;border-radius:8px;font-weight:700;font-size:18px;background:#fff;border:1px solid var(--bd);color:var(--tx)}
+  .step button.plus{background:var(--p);border-color:var(--p);color:#fff}
+  .step output{min-width:30px;text-align:center;font-weight:700}
+  .empty{text-align:center;color:var(--mu);padding:28px 12px;font-size:14px}
+  footer{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--bd);padding:12px 16px;display:flex;gap:12px;align-items:center}
+  footer .sum b{display:block;font-size:17px}
+  .btn{height:50px;border-radius:12px;padding:0 16px;font-weight:700;font-size:15px;background:#fff;border:1px solid #D1D5DB;color:var(--tx)}
+  .btn.pri{background:var(--p);border-color:var(--p);color:#fff}
+  .btn:disabled{opacity:.45}
+  .btn.full{flex:1;width:100%}
+  /* bottom sheet */
+  .ov{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;z-index:20}
+  .ov.show{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:#fff;border-radius:20px 20px 0 0;padding:12px 16px 16px;
+         display:none;flex-direction:column;gap:14px;z-index:21;max-height:92vh;overflow:auto}
+  .sheet.show{display:flex}
+  .handle{width:40px;height:4px;border-radius:2px;background:#D1D5DB;margin:0 auto}
+  .warnic{width:40px;height:40px;border-radius:20px;background:var(--al);display:grid;place-items:center;flex:none}
+  .seg{display:flex;gap:4px;background:#F3F4F6;padding:4px;border-radius:10px}
+  .seg button{flex:1;padding:8px;border-radius:8px;background:transparent;color:var(--mu);font-weight:500;font-size:13px}
+  .seg button.on{background:#fff;color:var(--tx);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:500;flex:1;min-width:0}
+  label em{color:var(--r);font-style:normal}
+  label>span{display:block}
+  .f{height:42px;border:1px solid #D1D5DB;border-radius:8px;padding:0 12px;font:15px inherit;color:var(--tx);background:#fff;width:100%}
+  .f:focus{outline:2px solid var(--p);border-color:var(--p)}
+  .two{display:flex;gap:10px}
+  .qty{display:flex;justify-content:space-between;align-items:center;background:var(--tint);border-radius:10px;padding:10px 12px;font-weight:600}
+  .err-msg{color:var(--r);font-size:12px;font-weight:500;min-height:0}
+  .pick{display:flex;flex-direction:column;gap:6px;max-height:38vh;overflow:auto}
+  .pick button{display:flex;justify-content:space-between;gap:8px;text-align:left;padding:10px 12px;border-radius:10px;background:#fff;border:1px solid var(--bd)}
+  .pick button.on{border:2px solid var(--p);background:var(--tint)}
+  /* layar selesai */
+  .done{display:none;flex-direction:column;align-items:center;gap:14px;padding:24px 16px}
+  .done.show{display:flex}
+  .done .btn{flex:none}
+  .big{width:72px;height:72px;border-radius:36px;background:#22C55E;display:grid;place-items:center;box-shadow:0 0 0 10px var(--gl)}
+  .done h2{margin:6px 0 0;font-size:20px}
+  .rows{width:100%;overflow:hidden}
+  .rows .r{display:flex;align-items:center;gap:8px;padding:11px 14px;border-top:1px solid #F1F3F5}
+  .rows .r:first-child{border-top:0}
+  .pill{background:var(--gl);color:var(--g);font-weight:700;font-size:12px;border-radius:999px;padding:3px 8px}
+  .tot{display:flex;justify-content:space-between;padding:12px 14px;background:#F9FAFB;font-weight:700;color:var(--g)}
+  .toast{position:fixed;left:50%;top:76px;transform:translateX(-50%);background:var(--tx);color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;z-index:30;display:none;max-width:90vw}
+  .toast.show{display:block}
+  /* motion: singkat, hanya transform/opacity, tidak menahan scan */
+  @media (prefers-reduced-motion:no-preference){
+    @keyframes rise{from{opacity:0;transform:translateY(8px)}}
+    @keyframes fade{from{opacity:0}}
+    @keyframes up{from{transform:translateY(100%)}}
+    @keyframes pop{40%{transform:scale(1.2)}}
+    @keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+    @keyframes flash{from{background-color:var(--pl)}}
+    @keyframes draw{from{stroke-dashoffset:30}}
+    @keyframes ring{from{box-shadow:0 0 0 0 var(--gl)}}
+    @keyframes drop{from{opacity:0;transform:translate(-50%,-10px)}}
+    button{transition:transform .12s}
+    button:active:not(:disabled){transform:scale(.96)}
+    .gate:not([hidden])>*{animation:rise .35s backwards}
+    .last.show{animation:rise .2s}
+    .last.show .ok{animation:pop .3s}
+    .scan.err{animation:shake .3s}
+    .item.hl{animation:flash .6s}
+    .ov.show{animation:fade .2s}
+    .sheet.show{animation:up .28s cubic-bezier(.2,.8,.2,1)}
+    .done.show>*{animation:rise .35s backwards}
+    .done.show .big{animation:pop .45s,ring .7s}
+    .done.show .big path{stroke-dasharray:30;animation:draw .45s .2s backwards}
+    .toast.show{animation:drop .2s}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M3 5v14M8 5v14M12 5v14M17 5v14M21 5v14"/></svg>
+    <div class="grow"><h1>Barang Masuk</h1><p id="sub">Scan barcode barang yang datang</p></div>
+    <button class="hbtn" type="button" id="out"><span id="who"></span><br>Keluar</button>
+  </header>
+  <section class="gate" id="gate" hidden>
+    <h2 style="margin:8px 0 0">Masuk</h2>
+    <p class="muted" style="margin:0">Masukkan PIN 6 digit. Barang yang di-scan masuk ke stok cabang akun Anda.</p>
+    <form id="gateForm" autocomplete="off">
+      <input class="f" id="gPin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN 6 digit" aria-label="PIN 6 digit">
+      <label id="gBranchWrap" hidden>Cabang tujuan stok<select class="f" id="gBranch"></select></label>
+      <p id="gErr" role="alert" style="margin:0;color:var(--r);font-size:13px"></p>
+      <button class="btn pri full" id="gBtn">Masuk</button>
+    </form>
+  </section>
+
+  <section id="scanView" style="display:contents">
+    <main>
+      <div class="scan" id="scanCard">
+        <div class="row">
+          <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2" stroke-linecap="round"><path d="M3 5v14M8 5v14M12 5v14M17 5v14M21 5v14"/></svg></div>
+          <div class="grow"><div style="font-weight:700"><span class="dot"></span><span id="scanState">Siap memindai</span></div>
+            <div class="muted" id="scanHint">Arahkan barcode lalu tekan tombol SCAN</div></div>
+        </div>
+        <div class="inp">
+          <input id="scan" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="none" enterkeyhint="done"
+                 placeholder="Menunggu scan…" aria-label="Hasil scan barcode">
+          <small>ENTER ⏎</small>
+        </div>
+      </div>
+      <div class="last" id="last" role="status" aria-live="polite">
+        <div class="ok" id="lastIc"></div>
+        <div class="grow"><b id="lastName"></b><span id="lastInfo"></span></div>
+        <small class="muted">baru saja</small>
+      </div>
+      <div class="lh"><span id="count">Daftar Barang (0)</span><button class="link" id="clear">Kosongkan</button></div>
+      <div class="list" id="list"></div>
+    </main>
+    <footer>
+      <div class="sum"><span class="muted" id="sumP">0 produk</span><b id="sumU">0 unit</b></div>
+      <button class="btn pri full" id="save" disabled>Simpan ke Stok</button>
+    </footer>
+  </section>
+
+  <section class="done" id="doneView">
+    <div class="big"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+    <h2>Stok berhasil diperbarui</h2>
+    <div class="muted" id="doneMeta"></div>
+    <div class="card rows" id="doneRows"></div>
+    <button class="btn pri full" id="again">Scan Barang Lagi</button>
+  </section>
+</div>
+
+<div class="ov" id="ov"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+  <div class="handle"></div>
+  <div class="row">
+    <div class="warnic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg></div>
+    <div class="grow"><b id="shTitle" style="font-size:17px">Barcode belum terdaftar</b><div class="muted" id="shCode" style="font-weight:600;font-size:13px"></div></div>
+  </div>
+  <div class="seg"><button class="on" data-tab="new">＋ Produk baru</button><button data-tab="link">🔗 Hubungkan ke produk</button></div>
+  <div id="tabNew" style="display:flex;flex-direction:column;gap:12px">
+    <label><span>Nama Produk <em>*</em></span><input class="f" id="nName" maxlength="80"></label>
+    <div class="two">
+      <label><span>Kategori <em>*</em></span><select class="f" id="nCat"></select></label>
+      <label>Satuan<input class="f" id="nUnit" value="pcs" maxlength="20"></label>
+    </div>
+    <label><span>Harga Jual <em>*</em></span><input class="f" id="nPrice" inputmode="numeric" placeholder="Rp"></label>
+  </div>
+  <div id="tabLink" style="display:none;flex-direction:column;gap:10px">
+    <input class="f" id="lSearch" placeholder="Cari nama produk…">
+    <div class="pick" id="lList"></div>
+  </div>
+  <div class="qty">Jumlah diterima
+    <div class="step"><button type="button" id="qMinus">−</button><output id="qVal">1</output><button type="button" class="plus" id="qPlus">+</button></div>
+  </div>
+  <div class="err-msg" id="shErr"></div>
+  <div class="two"><button class="btn" id="skip">Lewati</button><button class="btn pri full" id="shSave">Simpan &amp; Tambahkan</button></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const BARCODE_RE = /^[0-9A-Za-z-]{4,32}$/;
+const COLORS = {Makanan:'#FDE68A',Minuman:'#BAE6FD',Snack:'#FBCFE8','Kebutuhan Rumah':'#DDD6FE'};
+const DRAFT_KEY = 'barangMasuk.draft';
+const rp = n => 'Rp' + Number(n).toLocaleString('id-ID');
+const ean13ok = c => !(c.length === 13 && /^\d+$/.test(c)) ||
+  (10 - [...c.slice(0, 12)].reduce((s, d, i) => s + d * (i % 2 ? 3 : 1), 0) % 10) % 10 === +c[12];
+const initials = n => n.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// Draft disimpan di perangkat supaya daftar tidak hilang kalau halaman tertutup sebelum "Simpan ke Stok".
+let items = [];
+try { items = JSON.parse(localStorage.getItem(DRAFT_KEY)) || []; } catch { items = []; }
+const persist = () => { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(items)); } catch {} };
+
+let sheetCode = null, sheetTab = 'new', sheetQty = 1, linkPick = null, catalog = null, hlCode = null;
+
+// ---- login: kasir memakai cabangnya sendiri, owner/admin memilih cabang tujuan stok ----
+let token = null, me = null, branch = null, branchName = '';
+try { token = localStorage.getItem('pda.token'); me = JSON.parse(localStorage.getItem('pda.user')); branch = localStorage.getItem('pda.branch'); branchName = localStorage.getItem('pda.branchName') || ''; } catch {}
+const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+const withBranch = path => me && !me.branch_id && branch ? path + (path.includes('?') ? '&' : '?') + 'branch=' + branch : path;
+
+async function api(method, path, body) {
+  const headers = {'Content-Type': 'application/json'};
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const r = await fetch(withBranch(path), {method, headers, body: body && JSON.stringify(body)});
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== '/api/login') showGate('Sesi habis, silakan masuk lagi');
+  if (!r.ok) throw Object.assign(new Error(data.error || 'Gagal terhubung ke server'), {status: r.status, data});
+  return data;
+}
+function showGate(msg) {
+  token = me = branch = null; ['pda.token', 'pda.user', 'pda.branch', 'pda.branchName'].forEach(k => store(k, null));
+  $('#gate').hidden = false; $('#gBranchWrap').hidden = true; $('#gBtn').textContent = 'Masuk';
+  $('#gPin').value = ''; $('#gErr').textContent = msg || ''; $('#gPin').focus();
+}
+function enter() {
+  $('#gate').hidden = true; catalog = null;
+  $('#who').textContent = me.name + ' · ' + (me.branch || branchName);
+  focusScan();
+}
+
+// ---- umpan balik ----
+let actx;
+function beep(ok) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.value = ok ? 1500 : 300; g.gain.value = 0.15;
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + (ok ? 0.08 : 0.35));
+  } catch {}
+  if (navigator.vibrate) navigator.vibrate(ok ? 40 : [80, 60, 80]);
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
+function showLast(ok, name, info) {
+  $('#last').className = 'last'; void $('#last').offsetWidth;  // putar ulang animasi tiap scan
+  $('#last').className = 'last show' + (ok ? '' : ' warn');
+  $('#lastIc').innerHTML = ok
+    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>'
+    : '<b style="color:#fff">!</b>';
+  $('#lastName').textContent = name; $('#lastInfo').textContent = info;
+  $('#scanCard').classList.toggle('err', !ok);
+  $('#scanState').textContent = ok ? 'Siap memindai' : 'Scan gagal';
+  beep(ok);
+}
+
+// ---- daftar ----
+function render() {
+  const list = $('#list');
+  if (!items.length) list.innerHTML = '<div class="empty">Belum ada barang. Scan barcode barang yang datang untuk mulai.</div>';
+  else list.innerHTML = items.map((it, i) => `
+    <div class="item${it.barcode === hlCode ? ' hl' : ''}">
+      <div class="thumb" style="background:${COLORS[it.product.category] || '#E5E7EB'}">${esc(initials(it.product.name))}</div>
+      <div class="grow"><b>${esc(it.product.name)}</b><div class="muted" style="font-size:11px">${esc(it.barcode)}</div>
+        <div class="st">Stok ${it.product.stock} → ${it.product.stock + it.qty}</div></div>
+      <div class="step"><button data-i="${i}" data-d="-1" aria-label="Kurangi">−</button><output>${it.qty}</output>
+        <button class="plus" data-i="${i}" data-d="1" aria-label="Tambah">+</button></div>
+    </div>`).join('');
+  const units = items.reduce((s, i) => s + i.qty, 0);
+  $('#count').textContent = `Daftar Barang (${items.length})`;
+  $('#sumP').textContent = `${items.length} produk`;
+  $('#sumU').textContent = `${units} unit`;
+  $('#save').disabled = !items.length;
+  persist();
+}
+$('#list').addEventListener('click', e => {
+  const b = e.target.closest('button[data-i]'); if (!b) return;
+  const it = items[+b.dataset.i];
+  it.qty += +b.dataset.d;
+  if (it.qty <= 0) items.splice(+b.dataset.i, 1);
+  else if (it.qty > 9999) it.qty = 9999;
+  render(); focusScan();
+});
+$('#clear').onclick = () => { if (items.length && confirm('Kosongkan semua barang yang sudah discan?')) { items = []; render(); } focusScan(); };
+
+function addItem(product, barcode, qty) {
+  const ex = items.find(i => i.barcode === barcode);
+  if (ex) { ex.qty = Math.min(9999, ex.qty + qty); items.splice(items.indexOf(ex), 1); items.unshift(ex); }
+  else items.unshift({barcode, product, qty});
+  hlCode = barcode;
+  const total = items[0].qty;
+  showLast(true, product.name, `+${qty} · total diterima ${total} ${product.unit}`);
+  render();
+}
+
+// ---- scan ----
+let queue = Promise.resolve();
+const onScan = code => { queue = queue.then(() => handleScan(code)).catch(() => {}); };
+async function handleScan(raw) {
+  const code = raw.trim();
+  if (!code) return;
+  scanEl.placeholder = code; // jangan isi .value: scan berikutnya akan menempel
+  if (!BARCODE_RE.test(code)) return showLast(false, 'Barcode tidak dikenali', 'Format tidak valid, scan ulang');
+  if (!ean13ok(code)) return showLast(false, code, 'Salah baca (digit cek salah), scan ulang');
+  const ex = items.find(i => i.barcode === code);
+  if (ex) return addItem(ex.product, code, 1);
+  try {
+    addItem(await api('GET', '/api/products/barcode/' + encodeURIComponent(code)), code, 1);
+  } catch (e) {
+    if (e.status === 404) { beep(false); openSheet(code); }
+    else showLast(false, code, e.message);
+  }
+}
+const scanEl = $('#scan');
+scanEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); onScan(scanEl.value); scanEl.value = ''; }
+});
+// Cadangan: kalau fokus lepas, hasil scan (ketikan cepat + Enter) tetap ditangkap.
+let buf = '', bufT = 0;
+document.addEventListener('keydown', e => {
+  if (sheetCode || e.target === scanEl || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.key === 'Enter') { if (buf) onScan(buf); buf = ''; return; }
+  if (e.key.length === 1) { if (Date.now() - bufT > 100) buf = ''; buf += e.key; bufT = Date.now(); }
+});
+function focusScan() { if ($('#gate').hidden && !sheetCode && $('#doneView').className.indexOf('show') < 0) scanEl.focus({preventScroll: true}); }
+scanEl.addEventListener('blur', () => setTimeout(() => {
+  if (document.activeElement === document.body || !document.activeElement) focusScan();
+}, 150));
+
+// ---- sheet barcode belum terdaftar ----
+async function loadCatalog() {
+  if (!catalog) catalog = await api('GET', '/api/products');
+  return catalog;
+}
+async function openSheet(code) {
+  sheetCode = code; sheetQty = 1; linkPick = null;
+  $('#shCode').textContent = code; $('#shErr').textContent = '';
+  ['#nName', '#nPrice', '#lSearch'].forEach(s => $(s).value = ''); $('#nUnit').value = 'pcs';
+  $('#qVal').textContent = 1; setTab('new');
+  $('#ov').classList.add('show'); $('#sheet').classList.add('show');
+  $('#scanState').textContent = 'Barcode belum terdaftar';
+  try {
+    const c = await loadCatalog();
+    $('#nCat').innerHTML = c.categories.map(x => `<option>${esc(x)}</option>`).join('');
+    renderPick();
+  } catch (e) { $('#shErr').textContent = e.message; }
+  $('#nName').focus();
+}
+function closeSheet() {
+  sheetCode = null; $('#ov').classList.remove('show'); $('#sheet').classList.remove('show');
+  $('#scanState').textContent = 'Siap memindai'; $('#scanCard').classList.remove('err'); focusScan();
+}
+function setTab(t) {
+  sheetTab = t;
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  $('#tabNew').style.display = t === 'new' ? 'flex' : 'none';
+  $('#tabLink').style.display = t === 'link' ? 'flex' : 'none';
+  $('#shSave').textContent = t === 'new' ? 'Simpan & Tambahkan' : 'Hubungkan & Tambahkan';
+}
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+function renderPick() {
+  const q = $('#lSearch').value.trim().toLowerCase();
+  const ps = (catalog?.products || []).filter(p => p.name.toLowerCase().includes(q)).slice(0, 50);
+  $('#lList').innerHTML = ps.map(p => `<button type="button" data-id="${p.id}" class="${p.id === linkPick ? 'on' : ''}">
+      <span><b style="font-size:14px">${esc(p.name)}</b><br><span class="muted">${esc(p.category)} · stok ${p.stock}</span></span>
+      <span class="muted">${rp(p.price)}</span></button>`).join('') || '<div class="empty">Produk tidak ditemukan</div>';
+}
+$('#lSearch').oninput = renderPick;
+$('#lList').onclick = e => { const b = e.target.closest('button[data-id]'); if (b) { linkPick = +b.dataset.id; renderPick(); } };
+$('#qMinus').onclick = () => { sheetQty = Math.max(1, sheetQty - 1); $('#qVal').textContent = sheetQty; };
+$('#qPlus').onclick = () => { sheetQty = Math.min(9999, sheetQty + 1); $('#qVal').textContent = sheetQty; };
+$('#skip').onclick = closeSheet;
+$('#ov').onclick = closeSheet;
+const money = s => { const v = String(s).replace(/\D/g, ''); return v === '' ? null : parseInt(v, 10); };
+$('#shSave').onclick = async () => {
+  $('#shErr').textContent = '';
+  const btn = $('#shSave'); btn.disabled = true;
+  try {
+    let p;
+    if (sheetTab === 'new') {
+      const price = money($('#nPrice').value);
+      if (!$('#nName').value.trim()) throw new Error('Nama produk wajib diisi');
+      if (price === null) throw new Error('Harga jual wajib diisi');
+      p = await api('POST', '/api/products', {barcode: sheetCode, name: $('#nName').value, category: $('#nCat').value,
+        unit: $('#nUnit').value, price});
+    } else {
+      if (!linkPick) throw new Error('Pilih produk yang ingin dihubungkan');
+      p = await api('POST', `/api/products/${linkPick}/barcodes`, {barcode: sheetCode});
+    }
+    catalog = null;
+    const code = sheetCode; closeSheet(); addItem(p, code, sheetQty);
+  } catch (e) { $('#shErr').textContent = e.message; }
+  finally { btn.disabled = false; }
+};
+
+// ---- simpan ----
+$('#save').onclick = async () => {
+  const btn = $('#save'); btn.disabled = true; btn.textContent = 'Menyimpan…';
+  try {
+    const r = await api('POST', '/api/receipts', {items: items.map(i => ({barcode: i.barcode, qty: i.qty}))});
+    items = []; hlCode = null; render();
+    const dt = new Date(r.created_at);
+    $('#doneMeta').textContent = `${r.number} · ${dt.toLocaleDateString('id-ID')} ${dt.toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit'})}`;
+    $('#sub').textContent = 'Tersimpan: ' + r.number;
+    const units = r.items.reduce((s, i) => s + i.qty, 0);
+    $('#doneRows').innerHTML = r.items.map(i => `<div class="r"><div class="grow"><b style="font-size:13px">${esc(i.name)}</b>
+        <div class="muted">Stok ${i.before} → ${i.after}</div></div><span class="pill">+${i.qty}</span></div>`).join('')
+      + `<div class="tot"><span class="muted" style="font-weight:500">${r.items.length} produk</span><span>+${units} unit</span></div>`;
+    $('#scanView').style.display = 'none'; $('#doneView').classList.add('show');
+  } catch (e) {
+    toast(e.data?.missing ? `Barcode belum terdaftar: ${e.data.missing.join(', ')}` : e.message);
+    beep(false);
+  } finally { btn.textContent = 'Simpan ke Stok'; btn.disabled = !items.length; }
+};
+$('#again').onclick = () => {
+  $('#doneView').classList.remove('show'); $('#scanView').style.display = 'contents';
+  $('#last').className = 'last'; $('#sub').textContent = 'Scan barcode barang yang datang'; focusScan();
+};
+
+$('#gateForm').onsubmit = async e => {
+  e.preventDefault(); $('#gErr').textContent = ''; $('#gBtn').disabled = true;
+  try {
+    if (!token) {
+      const r = await api('POST', '/api/login', {pin: $('#gPin').value});
+      token = r.token; me = r.user; store('pda.token', token); store('pda.user', JSON.stringify(me));
+    }
+    if (me.role === 'stok') { api('POST', '/api/logout').catch(() => {}); return showGate('Akun karyawan stok hanya untuk melihat stok menipis di aplikasi Kasir.'); }
+    if (!me.branch_id) {
+      if ($('#gBranchWrap').hidden) {
+        const bs = await api('GET', '/api/branches');
+        $('#gBranch').innerHTML = bs.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+        $('#gBranchWrap').hidden = false; $('#gBtn').textContent = 'Pakai cabang ini'; return;
+      }
+      branch = $('#gBranch').value; branchName = $('#gBranch').selectedOptions[0].textContent;
+      store('pda.branch', branch); store('pda.branchName', branchName);
+    }
+    enter();
+  } catch (err) { $('#gErr').textContent = err.message; }
+  finally { $('#gBtn').disabled = false; }
+};
+$('#out').onclick = async () => { try { await api('POST', '/api/logout'); } catch {} showGate(); };
+
+render();
+token && me && (me.branch_id || branch) ? enter() : showGate();
+</script>
+</body>
+</html>
