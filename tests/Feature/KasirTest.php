@@ -12,13 +12,19 @@ class KasirTest extends TestCase
 
     protected $seed = true;
 
+    private const PINS = ['Kasir 1' => '111111', 'Admin' => '123456', 'Owner' => '888888', 'Staf Stok' => '444444'];
+
     protected function setUp(): void
     {
         parent::setUp();
+        // Seeder memberi PIN acak; tes memakai PIN tetap supaya bisa masuk sebagai tiap peran.
+        foreach (self::PINS as $name => $pin) {
+            \DB::table('cashiers')->where('name', $name)->update(['pin_hash' => \Hash::make($pin)]);
+        }
         $this->login(); // PDA & daftar produk kini perlu login (supaya tahu cabangnya); default Kasir 1 di Cabang 1
     }
 
-    private function login(string $pin = '111111') // PIN awal di DatabaseSeeder: Kasir 1, Admin 123456, Owner 888888, Staf Stok 444444
+    private function login(string $pin = '111111') // PIN tes (lihat PINS): Kasir 1, Admin 123456, Owner 888888, Staf Stok 444444
     {
         $res = $this->postJson('/api/login', ['pin' => $pin]);
         if ($res->status() === 200) {
@@ -208,6 +214,50 @@ class KasirTest extends TestCase
         $this->getJson('/api/report?from=2020-01-01&to=2020-01-31')->assertOk()->assertJson(['count' => 0, 'revenue' => 0]);
         $this->login('123456');
         $this->getJson('/api/report')->assertJson(['count' => 2, 'profit' => 5 * (4000 - 2200) + (25000 - 14000)]);
+    }
+
+    public function test_profit_uses_cost_at_time_of_sale(): void
+    {
+        $code = '8991234500089'; // Air Mineral: jual 4000, modal 2200
+        $pid = $this->pid($code);
+        $res = $this->postJson('/api/sales', ['items' => [['product_id' => $pid, 'qty' => 5]], 'method' => 'QRIS'])->assertStatus(201);
+        $this->assertArrayNotHasKey('cost', $res->json('items.0')); // struk tidak membuka harga modal
+        $this->assertSame(2200, (int) \DB::table('sale_items')->value('cost'));
+
+        $this->login('888888');
+        $edit = ['sku' => 'MNM-008', 'name' => 'Air Mineral 600ml', 'category' => 'Minuman', 'unit' => 'botol', 'price' => 4000, 'cost' => 3000];
+        $this->putJson("/api/products/$pid?branch=1", $edit)->assertOk()->assertJson(['cost' => 3000]);
+
+        $this->login();
+        $this->postJson('/api/sales', ['items' => [['product_id' => $pid, 'qty' => 1]], 'method' => 'QRIS'])->assertStatus(201);
+        $this->login('123456');
+        // 5 terjual saat modal 2200 tetap dihitung 2200; 1 terjual setelah modal jadi 3000
+        $this->getJson('/api/report')->assertJson(['profit' => 5 * (4000 - 2200) + (4000 - 3000)]);
+    }
+
+    public function test_profit_can_be_negative_when_sold_below_cost(): void
+    {
+        $pid = $this->pid('8991234500089');
+        $this->login('888888');
+        $this->putJson("/api/products/$pid?branch=1", ['sku' => 'MNM-008', 'name' => 'Air Mineral 600ml', 'category' => 'Minuman',
+            'unit' => 'botol', 'price' => 2000, 'cost' => 2200])->assertOk();
+        $this->login();
+        $this->postJson('/api/sales', ['items' => [['product_id' => $pid, 'qty' => 2]], 'method' => 'QRIS'])->assertStatus(201);
+        $this->login('123456');
+        $this->getJson('/api/report')->assertJson(['profit' => 2 * (2000 - 2200)]);
+    }
+
+    public function test_seeder_gives_random_unique_pins(): void
+    {
+        \DB::table('cashiers')->delete(); // seolah pemasangan baru
+        $this->artisan('db:seed')->expectsOutputToContain('PIN acak')->assertExitCode(0);
+        $hashes = \DB::table('cashiers')->pluck('pin_hash', 'name');
+        $this->assertSame(['Admin', 'Kasir 1', 'Owner', 'Staf Stok'], $hashes->keys()->sort()->values()->all());
+        foreach (['111111', '123456', '888888', '444444'] as $oldPin) { // PIN lama yang dulu tertulis di README
+            $this->assertFalse($hashes->contains(fn ($h) => \Hash::check($oldPin, $h)));
+        }
+        $this->artisan('db:seed')->doesntExpectOutputToContain('PIN acak')->assertExitCode(0); // akun lama tidak disentuh
+        $this->assertEquals($hashes, \DB::table('cashiers')->pluck('pin_hash', 'name'));
     }
 
     // ---------- peran ----------

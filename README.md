@@ -10,15 +10,17 @@ Satu server untuk semua perangkat di toko:
 Data tersimpan di **MySQL/MariaDB XAMPP**, database `kasir_laravel` (bisa dilihat di phpMyAdmin).
 
 ## 1. Jalankan
-Butuh **PHP 8.3+** (Laravel 13). PHP bawaan XAMPP (8.2) terlalu lama, jadi aplikasi ini **tidak bisa dibuka lewat
+Butuh **PHP 8.4+** (paket Laravel 13 di `composer.lock` membutuhkan PHP 8.4). PHP bawaan XAMPP (8.2) terlalu lama, jadi aplikasi ini **tidak bisa dibuka lewat
 Apache XAMPP** (`localhost/laravel/claude/kasir`). Jalankan dengan PHP Homebrew lewat `php artisan serve`:
 
 1. Buka **XAMPP**, nyalakan **MySQL** (port 3306).
 2. Isi sandi user `root` MySQL di file `.env`, baris `DB_PASSWORD=` (pakai tanda kutip bila ada karakter khusus).
-3. Sekali saja, buat database, tabel, 12 produk contoh, dan 2 akun kasir:
+3. Sekali saja, buat database, tabel, 12 produk contoh, dan 4 akun awal:
    ```bash
    php artisan migrate --seed --force
    ```
+   Perintah ini menampilkan **PIN acak** untuk tiap akun awal. Catat saat itu juga, karena PIN tidak disimpan dalam bentuk
+   yang bisa dibaca dan tidak ditampilkan lagi. Kalau lupa, buat PIN baru dengan `php artisan kasir:pin "<nama akun>"`.
 4. Jalankan server (biarkan terminalnya terbuka):
    ```bash
    php artisan serve --host 0.0.0.0 --port 8082
@@ -26,12 +28,14 @@ Apache XAMPP** (`localhost/laravel/claude/kasir`). Jalankan dengan PHP Homebrew 
    Kasir buka `http://<IP-laptop>:8082`, PDA buka `http://<IP-laptop>:8082/pda` (harus satu Wi-Fi).
 
 ### Akun awal
-| Akun | PIN | Peran | Yang bisa dilakukan |
-|---|---|---|---|
-| Kasir 1 | `111111` | kasir (Cabang 1) | Transaksi, tambah produk baru (tanpa harga modal), Barang Masuk, laporan cabangnya tanpa laba kotor, kirim laporan harian cabangnya |
-| Admin | `123456` | admin (semua cabang) | Hanya membaca laporan semua cabang atau satu cabang (termasuk laba kotor) dan laporan harian |
-| Owner | `888888` | owner (semua cabang) | Kelola katalog produk (ubah, hapus, harga modal, harga standar, harga per cabang), laporan semua cabang. Tidak bisa melakukan transaksi penjualan |
-| Staf Stok | `444444` | stok (semua cabang) | Hanya melihat barang yang menipis (stok ≤ 5) dan habis per cabang, untuk dikirimi stok baru. Tanpa harga, laporan, penjualan, atau Barang Masuk |
+PIN tiap akun dibuat acak saat `migrate --seed` (lihat langkah 3), jadi tidak ada PIN bawaan yang sama di setiap pemasangan.
+
+| Akun | Peran | Yang bisa dilakukan |
+|---|---|---|
+| Kasir 1 | kasir (Cabang 1) | Transaksi, tambah produk baru (tanpa harga modal), Barang Masuk, laporan cabangnya tanpa laba kotor, kirim laporan harian cabangnya |
+| Admin | admin (semua cabang) | Hanya membaca laporan semua cabang atau satu cabang (termasuk laba kotor) dan laporan harian |
+| Owner | owner (semua cabang) | Kelola katalog produk (ubah, hapus, harga modal, harga standar, harga per cabang), laporan semua cabang. Tidak bisa melakukan transaksi penjualan |
+| Staf Stok | stok (semua cabang) | Hanya melihat barang yang menipis (stok ≤ 5) dan habis per cabang, untuk dikirimi stok baru. Tanpa harga, laporan, penjualan, atau Barang Masuk |
 
 ### Cabang
 Katalog produk satu untuk semua cabang (dikelola owner), tetapi **stok dan harga jual per cabang**. Cabang baru mulai dengan stok 0 untuk semua produk; stok bertambah lewat Barang Masuk (PDA) di cabang itu. Harga cabang yang dikosongkan memakai harga standar. Kasir terikat ke satu cabang; admin dan owner memilih cabang di layar Produk dan Laporan, dan di PDA memilih cabang tujuan stok.
@@ -49,12 +53,15 @@ php artisan kasir:akun "Gudang 1" stok
 ```
 `kasir:akun` meminta PIN baru (harus beda dengan akun lain). Untuk admin/owner tidak perlu `--cabang`.
 
-**Ganti PIN ini sebelum dipakai sungguhan** (ulangi untuk tiap akun):
+Ganti PIN sebuah akun (misalnya kalau PIN-nya lupa atau diketahui orang lain):
 ```bash
 php artisan kasir:pin "Owner"
 ```
 
-**Memperbarui pemasangan lama** (menambah peran, akun Owner, laporan harian, dan cabang; semua data lama dipindah ke "Cabang 1", PIN yang sudah diganti tidak disentuh). Cadangkan database dulu. Setelah itu semua perangkat, termasuk PDA, perlu masuk ulang:
+**Pemasangan yang dibuat sebelum PIN acak** masih memakai PIN contoh yang dulu tertulis di README ini. Karena repo ini publik,
+ganti PIN keempat akun awal (Kasir 1, Admin, Owner, Staf Stok) dengan `kasir:pin` sebelum dipakai lagi.
+
+**Memperbarui pemasangan lama** (menambah peran, akun Owner, laporan harian, cabang, dan harga modal per penjualan; semua data lama dipindah ke "Cabang 1", PIN yang sudah diganti tidak disentuh). Cadangkan database dulu. Setelah itu semua perangkat, termasuk PDA, perlu masuk ulang:
 ```bash
 php artisan migrate --force
 ```
@@ -79,7 +86,7 @@ Scanner USB di meja kasir juga bisa dipakai: di layar Transaksi, scan barcode ke
 
 **Produk**: kasir dan PDA bisa menambah produk baru; mengubah, menghapus, dan mengatur harga hanya owner (karena berlaku untuk semua cabang). Harga modal hanya terlihat dan bisa diisi oleh owner. Di formulir ubah produk, owner mengisi harga jual standar dan harga khusus cabang yang sedang dipilih. Produk baru selalu mulai dari stok 0; stok bertambah lewat Barang Masuk (PDA). Produk yang stoknya masih ada di cabang mana pun tidak langsung hilang saat dihapus: produk diberi label **Dihapus saat stok habis**, tetap dijual di cabang yang masih punya stok, hilang dari cabang yang stoknya sudah 0, lalu terhapus otomatis begitu stok semua cabang habis terjual. Tombol **Batal hapus** di baris produk itu membatalkannya. Produk dengan stok 0 langsung terhapus. Produk yang terhapus hilang dari kasir, tapi riwayat penjualannya tetap ada di laporan, dan barcode-nya bisa dipakai lagi.
 
-**Laporan**: total penjualan, jumlah transaksi, rata-rata, laba kotor (harga jual − modal; tidak tampil untuk kasir), grafik per hari, metode pembayaran, produk terlaris, stok menipis (≤ 5), dan 20 transaksi terakhir. Pilih Hari ini / 7 hari / 30 hari, atau tanggal sendiri. Kasir menekan **Kirim Laporan Hari Ini** saat tutup toko: ringkasan penjualan cabangnya hari itu tersimpan di server dan muncul di daftar **Laporan harian terkirim** untuk admin dan owner (lengkap dengan laba kotor dan nama cabang). Satu laporan per tanggal per cabang; kirim ulang menimpa yang lama. Admin/owner bisa memilih **Semua cabang** atau satu cabang.
+**Laporan**: total penjualan, jumlah transaksi, rata-rata, laba kotor (harga jual − harga modal saat barang itu terjual, jadi mengubah harga modal tidak mengubah laporan lama; tidak tampil untuk kasir), grafik per hari, metode pembayaran, produk terlaris, stok menipis (≤ 5), dan 20 transaksi terakhir. Pilih Hari ini / 7 hari / 30 hari, atau tanggal sendiri. Kasir menekan **Kirim Laporan Hari Ini** saat tutup toko: ringkasan penjualan cabangnya hari itu tersimpan di server dan muncul di daftar **Laporan harian terkirim** untuk admin dan owner (lengkap dengan laba kotor dan nama cabang). Satu laporan per tanggal per cabang; kirim ulang menimpa yang lama. Admin/owner bisa memilih **Semua cabang** atau satu cabang.
 
 **Stok (karyawan stok)**: daftar barang habis dan menipis (≤ 5), dikelompokkan per cabang, bisa disaring Semua/Habis/Menipis dan per cabang. Datanya dari stok cabang saat ini; tekan **Muat ulang** untuk memperbarui.
 
@@ -105,10 +112,12 @@ Tidak butuh MySQL (memakai SQLite di memori):
 ```bash
 php artisan test
 ```
+Tes juga berjalan otomatis di GitHub Actions setiap push dan pull request (`.github/workflows/tes.yml`).
 
 ## Batasan saat ini
 - Belum ada layar kelola akun: peran ada di kolom `cashiers.role` (`kasir`/`admin`/`owner`), ganti PIN lewat `php artisan kasir:pin`.
-- Produk yang dibuat kasir atau lewat PDA tersimpan dengan harga modal 0 sampai owner mengisinya di layar Produk; selama itu laba kotornya terhitung terlalu besar.
+- Produk yang dibuat kasir atau lewat PDA tersimpan dengan harga modal 0 sampai owner mengisinya di layar Produk. Penjualan selama modalnya masih 0 tercatat dengan modal 0, jadi laba kotornya tetap terlalu besar walaupun modal diisi belakangan. Isi harga modal produk baru sebelum produk itu dijual.
+- Penjualan yang terjadi sebelum harga modal disimpan per penjualan diisi dengan harga modal produk saat `php artisan migrate` dijalankan.
 - Server masih berjalan di satu laptop (`php artisan serve`). Supaya semua cabang memakai data yang sama, aplikasi perlu dipasang di server pusat yang bisa diakses lewat internet (belum dilakukan).
 - Belum ada pemindahan stok antar cabang.
 - Hitungan "transaksi hari ini" di layar kasir disimpan di perangkat masing-masing (hanya penyemangat); angka resminya tetap di Laporan.

@@ -439,7 +439,7 @@ class KasirController extends Controller
         return response()->json($this->write(function () use ($r, $qty, $method, $user, $b, $now) {
             $lines = $short = [];
             foreach ($qty as $pid => $n) {
-                $p = DB::table('products')->where('id', $pid)->where('active', 1)->first(['name', 'price']);
+                $p = DB::table('products')->where('id', $pid)->where('active', 1)->first(['name', 'price', 'cost']);
                 if (! $p) {
                     self::fail(400, 'Ada produk yang sudah dihapus. Muat ulang halaman.');
                 }
@@ -448,7 +448,7 @@ class KasirController extends Controller
                 if ($bp->stock < $n) {
                     $short[] = "{$p->name} (sisa {$bp->stock})";
                 }
-                $lines[] = ['product_id' => $pid, 'name' => $p->name, 'price' => (int) ($bp->price ?? $p->price), 'qty' => $n];
+                $lines[] = ['product_id' => $pid, 'name' => $p->name, 'price' => (int) ($bp->price ?? $p->price), 'qty' => $n, 'cost' => (int) $p->cost];
             }
             if ($short) {
                 self::fail(409, 'Stok tidak cukup: '.implode(', ', $short));
@@ -466,10 +466,12 @@ class KasirController extends Controller
             $number = $this->nextNumber('sales', 'INV', 4, $now);
             $sid = DB::table('sales')->insertGetId(['number' => $number, 'created_at' => $now, 'cashier_id' => $user['id'], 'branch_id' => $b,
                 'subtotal' => $subtotal, 'tax' => $tax, 'total' => $total, 'method' => $method, 'paid' => $paid, 'change_due' => $paid - $total]);
-            foreach ($lines as $l) {
-                DB::table('sale_items')->insert(['sale_id' => $sid] + $l);
+            foreach ($lines as &$l) {
+                DB::table('sale_items')->insert(['sale_id' => $sid] + $l); // harga modal disimpan saat terjual, untuk laba kotor
+                unset($l['cost']); // struk tidak menampilkan harga modal
                 DB::table('branch_products')->where('branch_id', $b)->where('product_id', $l['product_id'])->decrement('stock', $l['qty']);
             }
+            unset($l);
             $this->retire(array_column($lines, 'product_id'));
 
             return ['number' => $number, 'created_at' => $now->format('Y-m-d\TH:i:s'), 'cashier' => $user['name'], 'items' => $lines,
@@ -557,8 +559,8 @@ class KasirController extends Controller
         $sum = fn (string $expr) => "CAST(COALESCE(SUM($expr), 0) AS SIGNED)"; // SUM di MySQL berupa DECIMAL (string di PHP)
 
         $out = (array) DB::selectOne("SELECT COUNT(*) AS count, {$sum('total')} AS revenue, {$sum('tax')} AS tax FROM sales s WHERE $w", $rng)
-            + (array) DB::selectOne("SELECT {$sum('si.qty')} AS items, {$sum('si.qty * (si.price - p.cost)')} AS profit
-                FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN products p ON p.id = si.product_id WHERE $w", $rng);
+            + (array) DB::selectOne("SELECT {$sum('si.qty')} AS items, {$sum('si.qty * (CAST(si.price AS SIGNED) - CAST(si.cost AS SIGNED))')} AS profit
+                FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE $w", $rng);
         $out['methods'] = DB::select("SELECT method, COUNT(*) AS count, {$sum('total')} AS amount FROM sales s WHERE $w
             GROUP BY method ORDER BY amount DESC", $rng);
         $out['top'] = DB::select("SELECT si.name, {$sum('si.qty')} AS qty, {$sum('si.qty * si.price')} AS amount FROM sale_items si
