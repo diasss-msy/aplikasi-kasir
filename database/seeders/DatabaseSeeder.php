@@ -24,8 +24,8 @@ class DatabaseSeeder extends Seeder
         ['8991234500126', 'KRT-002', 'Sabun Cuci Piring', 'Kebutuhan Rumah', 'pcs', 14500, 11000, 25],
     ];
 
-    // Akun awal [nama, PIN, peran]. Ganti PIN-nya setelah dipasang: php artisan kasir:pin
-    const CASHIERS = [['Kasir 1', '111111', 'kasir'], ['Admin', '123456', 'admin'], ['Owner', '888888', 'owner'], ['Staf Stok', '444444', 'stok']];
+    // Akun awal [nama, peran]. PIN dibuat acak saat seeding dan hanya ditampilkan sekali di terminal.
+    const CASHIERS = [['Kasir 1', 'kasir'], ['Admin', 'admin'], ['Owner', 'owner'], ['Staf Stok', 'stok']];
 
     /** Aman dijalankan ulang: produk hanya diisi bila kosong, akun yang sudah ada (dan PIN-nya) tidak disentuh. */
     public function run(): void
@@ -38,9 +38,31 @@ class DatabaseSeeder extends Seeder
                 DB::table('branch_products')->insert(['branch_id' => $branch, 'product_id' => $id, 'stock' => $stock]);
             }
         }
-        foreach (self::CASHIERS as [$name, $pin, $role]) { // name unik: akun yang belum ada saja yang ditambahkan
-            DB::table('cashiers')->insertOrIgnore(['name' => $name, 'pin_hash' => Hash::make($pin), 'role' => $role,
+        $baru = [];
+        foreach (self::CASHIERS as [$name, $role]) { // name unik: akun yang belum ada saja yang ditambahkan
+            if (DB::table('cashiers')->where('name', $name)->exists()) {
+                continue;
+            }
+            $pin = $this->pinAcak();
+            DB::table('cashiers')->insert(['name' => $name, 'pin_hash' => Hash::make($pin), 'role' => $role,
                 'branch_id' => $role === 'kasir' ? $branch : null]);
+            $baru[] = [$name, $pin, $role];
         }
+        if ($baru && $this->command) {
+            $this->command->warn('Akun awal dibuat dengan PIN acak. Catat sekarang, PIN ini tidak ditampilkan lagi:');
+            $this->command->table(['Akun', 'PIN', 'Peran'], $baru);
+            $this->command->warn('Ganti PIN kapan saja: php artisan kasir:pin "<nama akun>"');
+        }
+    }
+
+    /** PIN 6 angka acak yang belum dipakai akun mana pun (login mengenali akun dari PIN-nya). */
+    private function pinAcak(): string
+    {
+        $hashes = DB::table('cashiers')->pluck('pin_hash');
+        do {
+            $pin = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        } while ($hashes->contains(fn ($h) => Hash::check($pin, $h)));
+
+        return $pin;
     }
 }
